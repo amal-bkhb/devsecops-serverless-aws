@@ -31,3 +31,16 @@ module "lambda" {
   package_path = "${path.root}/../build/lambda.zip"
   table_name   = module.dynamodb.table_name
 }
+
+module "api" {
+  source      = "./modules/api"
+  name_prefix = local.name_prefix
+  routes = {
+    "GET /tasks"         = "get_tasks"
+    "POST /tasks"        = "create_task"
+    "PUT /tasks/{id}"    = "update_task"
+    "DELETE /tasks/{id}" = "delete_task"
+  }
+  invoke_arns    = module.lambda.invoke_arns
+  function_names = module.lambda.function_names
+}
