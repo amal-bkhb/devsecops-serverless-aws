@@ -23,3 +23,11 @@ module "iam" {
   kms_key_arn = module.dynamodb.kms_key_arn
   functions   = local.functions
 }
+
+module "lambda" {
+  source       = "./modules/lambda"
+  name_prefix  = local.name_prefix
+  role_arns    = module.iam.role_arns
+  package_path = "${path.root}/../build/lambda.zip"
+  table_name   = module.dynamodb.table_name
+}
