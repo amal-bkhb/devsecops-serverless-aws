@@ -168,6 +168,13 @@ data "aws_iam_policy_document" "apply" {
     ]
   }
 
+  statement {
+    sid       = "SmokeTestGetTasks"
+    actions   = ["execute-api:Invoke"]
+    resources = ["${local.arn_base}:execute-api:${var.region}:${local.account_id}:*/*/GET/tasks"]
+  }
+
+
   # Garde-fou : le rôle apply ne peut JAMAIS toucher à la chaîne de confiance CI
   statement {
     sid     = "InterdireEscaladeVersCI"

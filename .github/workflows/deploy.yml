@@ -1,0 +1,82 @@
+name: deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write   # nécessaire pour demander le jeton OIDC
+  contents: read
+
+concurrency:
+  group: deploy-dev
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-3
+  TF_IN_AUTOMATION: "true"
+  TF_VERSION: "1.13.4"
+  BUILD_SCRIPT: "infra/modules/lambda/build.sh"
+  API_OUTPUT: "api_endpoint"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Récupérer le code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+
+      - name: Installer Python 3.12
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+
+      - name: Construire le paquet Lambda
+        run: bash "$BUILD_SCRIPT"
+
+      - name: Installer Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          terraform_wrapper: false
+
+      - name: Authentification AWS par OIDC (rôle apply)
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_APPLY_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: gha-deploy-${{ github.run_id }}
+
+      - name: Terraform init
+        working-directory: infra
+        run: terraform init -input=false -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}"
+
+      - name: Terraform plan
+        working-directory: infra
+        run: terraform plan -input=false -out=tfplan
+
+      - name: Terraform apply (du plan ci-dessus)
+        working-directory: infra
+        run: terraform apply -input=false tfplan
+
+      - name: Smoke test
+        working-directory: infra
+        run: |
+          set -euo pipefail
+          BASE="$(terraform output -raw "$API_OUTPUT")"
+          URL="${BASE%/}/tasks"
+
+          echo "1) Requête signée : 200 attendu"
+          code=$(curl -s -o /dev/null -w "%{http_code}" \
+            --aws-sigv4 "aws:amz:${AWS_REGION}:execute-api" \
+            --user "${AWS_ACCESS_KEY_ID}:${AWS_SECRET_ACCESS_KEY}" \
+            -H "x-amz-security-token: ${AWS_SESSION_TOKEN}" \
+            "$URL")
+          echo "statut = $code"; [ "$code" = "200" ]
+
+          echo "2) Requête non signée : 403 attendu (API non publique)"
+          code=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          echo "statut = $code"; [ "$code" = "403" ]
