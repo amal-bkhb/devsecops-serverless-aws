@@ -16,7 +16,7 @@ env:
   AWS_REGION: eu-west-3
   TF_IN_AUTOMATION: "true"
   TF_VERSION: "1.13.4"
-  BUILD_SCRIPT: "<VRAI_CHEMIN>"
+  BUILD_SCRIPT: "scripts/build_lambda.sh"
   API_OUTPUT: "api_endpoint"
 
 jobs:
