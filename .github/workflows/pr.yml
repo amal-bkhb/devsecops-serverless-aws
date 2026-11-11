@@ -50,11 +50,13 @@ jobs:
           ./gitleaks git . --redact -v
 
       - name: "2. Semgrep : analyse statique du code Python"
+        if: ${{ !cancelled() }}
         run: |
           pip install "semgrep==${SEMGREP_VERSION}"
           semgrep scan --config p/python --config p/security-audit --error --metrics=off app/
 
       - name: "3. Trivy : CVE HIGH/CRITICAL dans les dépendances"
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           base="https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}"
@@ -65,11 +67,13 @@ jobs:
           ./trivy fs --scanners vuln --severity HIGH,CRITICAL --exit-code 1 app/
 
       - name: "4. pytest : tests unitaires"
+        if: ${{ !cancelled() }}
         run: |
           pip install -r app/requirements.txt -r app/requirements-dev.txt
           python -m pytest app/tests -q
 
       - name: "5. Checkov : conformité de l'IaC"
+        if: ${{ !cancelled() }}
         run: |
           pip install "checkov==${CHECKOV_VERSION}"
           checkov -d infra --compact --quiet
