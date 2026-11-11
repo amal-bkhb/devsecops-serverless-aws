@@ -23,3 +23,16 @@
 - Rôle plan : métadonnées uniquement (aucune lecture des données DynamoDB), écriture limitée au verrou `.tflock`.
 - `Resource: "*"` uniquement pour `kms:CreateKey`, `kms:ListAliases` et la livraison de logs (actions sans restriction par ARN).
 - Point à réduire : `kms:*` sur `key/*` (toutes les clés du compte) → réduction via CloudTrail et Access Analyzer.
+
+## OIDC — format du claim `sub` (Phase 2)
+
+- GitHub inclut les identifiants numériques immuables du propriétaire et du dépôt dans le `sub` :
+  `repo:<owner>@<owner_id>/<repo>@<repo_id>:ref:refs/heads/main`.
+- Les conditions IAM utilisent ce format exact (`StringEquals`, sans joker). Un nom de dépôt peut être
+  supprimé puis recréé par un tiers (repo-jacking) ; un identifiant numérique n'est jamais réattribué.
+- Diagnostic : refus `AssumeRoleWithWebIdentity` analysé en comparant la politique de confiance (AWS)
+  et les claims du jeton (étape temporaire, supprimée ensuite, n'affichant jamais le jeton).
+- ARN du rôle et nom du bucket stockés en secrets GitHub : ce ne sont pas des identifiants de connexion
+  (inutilisables sans jeton OIDC valide pour `main`), mais ils sont masqués dans les logs publics.
+- L'état du bootstrap est stocké sous `bootstrap/`, hors de `env/*` : les rôles CI n'y ont pas accès.
+- Smoke test : requête signée → 200, requête non signée → 403 (API non publique).
