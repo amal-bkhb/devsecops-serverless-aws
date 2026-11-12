@@ -52,8 +52,8 @@ Projet personnel : profil DevSecOps & Cloud Security, ENSIAS, filière Cybersecu
 | Déploiement sans clé (OIDC, identifiants temporaires) | [Déploiement vert](docs/screenshots/02-deploy-vert.png) |
 | L'API n'est pas publique (200 signé, 403 non signé) | [Smoke test](docs/screenshots/03-smoke-200-403.png) |
 | Une PR non conforme ne peut pas être fusionnée | [Fusion bloquée](docs/screenshots/04-pr-bloquee-merge-desactive.png) |
-| Chaque outil bloque son défaut | [5 étapes en échec](docs/screenshots/05-demo-v2-5-outils-rouges.png) · [Gitleaks](docs/screenshots/06-gitleaks.png) |
-| Les règles OPA bloquent ce que les outils génériques laissent passer | [Scans verts, OPA rouge](docs/screenshots/12-opa-scans-verts-plan-rouge.png) · [Message Conftest](docs/screenshots/12b-opa-conftest-fail.png) |
+| Chaque outil bloque son défaut ([PR #6](../../pull/6/checks)) | [5 étapes en échec](docs/screenshots/05-demo-v2-5-outils-rouges.png) · [Gitleaks](docs/screenshots/06-gitleaks.png) |
+| Les règles OPA bloquent ce que les outils génériques laissent passer ([PR #7](../../pull/7/checks)) | [Scans verts, OPA rouge](docs/screenshots/12-opa-scans-verts-plan-rouge.png) · [Message Conftest](docs/screenshots/12b-opa-conftest-fail.png) |
 | Le plan est publié sur chaque PR, sans valeur sensible | [Commentaire du plan](docs/screenshots/13-commentaire-plan.png) |
 
 ## Règles OPA (Rego v1)
@@ -80,6 +80,16 @@ Détail complet : [`docs/security-decisions.md`](docs/security-decisions.md)
 Une PR de démonstration vulnérable a été fusionnée : les contrôles n'étaient pas déclarés obligatoires.
 **Le moindre privilège du rôle de déploiement a bloqué les dégâts** : la politique `Action: "*"` et le bucket non chiffré n'ont jamais été créés.
 Correction par revert (sans réécriture d'historique) et checks rendus obligatoires. Le post-mortem est dans [`docs/security-decisions.md`](docs/security-decisions.md).
+
+## Reproduire le projet
+
+1. **Prérequis** : compte AWS avec MFA, Terraform ≥ 1.10, Python 3.12, AWS CLI v2, identifiants temporaires (`aws login`).
+2. **Bootstrap** (une seule fois, en local) : `cd infra/bootstrap && terraform init && terraform apply`
+   (bucket d'état, fournisseur OIDC, rôles plan et apply).
+3. **Secrets GitHub** : `AWS_ROLE_APPLY_ARN`, `AWS_ROLE_PLAN_ARN`, `TF_STATE_BUCKET` (sorties du bootstrap ; ce ne sont pas des clés).
+4. **Protection de `main`** : ruleset avec PR obligatoire et les deux checks de `pr.yml` requis.
+5. **Développer** : ouvrir une pull request → contrôles automatiques → fusion → déploiement.
+6. **En local** : `pytest app/tests`, `opa test policies/ -v`.
 
 ## Stack
 
