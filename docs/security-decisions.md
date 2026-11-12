@@ -64,3 +64,16 @@ factice qu'il reconnaît.
    mais pas par une fusion de PR rouge.
 2. Le moindre privilège du rôle de déploiement est une seconde ligne de défense réelle, pas théorique.
 3. Les branches de démonstration vulnérables ne doivent jamais être fusionnées ; leur PR doit rester ouverte puis être fermée.
+
+## Phase 3 — preuves et ajustements
+
+- **Démo v2 (PR #6)** : clé privée factice, `eval`/`shell=True`, `Jinja2==2.10`, test en échec,
+  IAM `Action: "*"` et bucket non chiffré → Gitleaks, Semgrep, Trivy, pytest et Checkov échouent
+  dans le même run (`if: !cancelled()`). Le job Plan est ignoré : aucun accès AWS pour du code non vérifié.
+- **Démo OPA (PR #7)** : log group créé hors des modules (donc hors des validations de variables),
+  rétention 60 jours → les 5 outils génériques passent, Conftest bloque (règle n° 5).
+- **Ruleset vérifié** : checks « Required », fusion désactivée tant qu'ils ne sont pas verts.
+- **Gitleaks limité à `HEAD`** : avec `fetch-depth: 0`, le scan portait sur toutes les branches
+  récupérées ; une branche de démo bloquait des PR sans rapport. Le scan couvre désormais tout
+  l'historique de `main` et les commits de la PR.
+- **Clé AWS factice non détectée** par Gitleaks (identifiant inventé) : remplacée par une clé privée factice.
