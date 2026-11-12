@@ -36,3 +36,31 @@
   (inutilisables sans jeton OIDC valide pour `main`), mais ils sont masqués dans les logs publics.
 - L'état du bootstrap est stocké sous `bootstrap/`, hors de `env/*` : les rôles CI n'y ont pas accès.
 - Smoke test : requête signée → 200, requête non signée → 403 (API non publique).
+
+## Post-mortem — fusion d'une PR volontairement vulnérable (PR #3, 11/11/2026)
+
+**Résumé.** Une PR de démonstration contenant un défaut par outil (secret factice, code dangereux,
+dépendance vulnérable, test en échec, IAM `Action: "*"`, bucket non chiffré) a été fusionnée dans `main`
+malgré l'échec des scans.
+
+**Cause racine.** Le ruleset de `main` était actif, mais les deux checks (`Scans de sécurité`,
+`Plan Terraform + politiques OPA`) n'étaient pas déclarés comme **obligatoires**. La fusion n'exigeait
+donc qu'une PR, pas des contrôles verts.
+
+**Ce qui a limité l'impact (défense en profondeur).** Le `deploy` a échoué : le rôle `apply` n'a ni
+`iam:CreatePolicy` ni `s3:CreateBucket`. La politique `Action: "*"` et le bucket non chiffré n'ont
+jamais été créés (vérifié avec `aws iam list-policies` et `aws s3api list-buckets`). Seul le code des
+Lambda a été mis à jour avec le paquet de démo (fichiers non reliés à l'API, clé factice).
+
+**Correction.** Revert par PR (#4, sans réécriture de l'historique), redéploiement propre (deploy #14,
+smoke test 200/403), ajout des deux checks obligatoires au ruleset.
+
+**Découverte.** Gitleaks ne détecte pas la clé AWS factice utilisée (aucune fuite trouvée sur les
+23 commits, y compris celui qui la contient). La démonstration Gitleaks sera refaite avec un secret
+factice qu'il reconnaît.
+
+**Leçons.**
+1. Un contrôle non testé ne compte pas : la protection de branche a été vérifiée par un push direct,
+   mais pas par une fusion de PR rouge.
+2. Le moindre privilège du rôle de déploiement est une seconde ligne de défense réelle, pas théorique.
+3. Les branches de démonstration vulnérables ne doivent jamais être fusionnées ; leur PR doit rester ouverte puis être fermée.
